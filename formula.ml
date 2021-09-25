@@ -19,6 +19,9 @@ type axiom_request =
     | Recurrence of (int * (var list -> formula))
     | Theorem of string;;
 
+let build_peano n = Peano n;;
+let build_theorem s = Theorem s;;
+
 type rec_builder =
   RAtom of int | RFree of int (* nth free variable in this expression, >= 1 *)
   | RNeg of rec_builder
@@ -30,10 +33,12 @@ type rec_builder =
   | REqual of (var * var);;
 
 (* TODO: trop restrectif, devrait permettre de garder des variables libres *)
-let build builder =
+(* totalement faux, j'aurais du remplacer dans les var et pas dans les prop *)
+let build_rec builder =
     let rec count = function
         | RAtom _ -> 0
         | RFree k -> k
+        | RNeg a -> count a
         | RAnd (a, b) -> max (count a) (count b)
         | ROr (a, b) -> max (count a) (count b)
         | RImplies (a, b) -> max (count a) (count b)
@@ -44,6 +49,7 @@ let build builder =
     let rec substitute n l = function
         | RAtom k -> Atom k
         | RFree k -> l.(k)
+        | RNeg a -> Neg (substitute n l a)
         | RAnd (a, b) -> And (substitute n l a, substitute n l b)
         | ROr (a, b) -> Or (substitute n l a, substitute n l b)
         | RImplies (a, b) -> Implies (substitute n l a, substitute n l b)
@@ -51,7 +57,7 @@ let build builder =
         | RExists a -> Exists (substitute n l a)
         | REqual a -> Equal a
     in let recurrent l =
-        let arr = Array.of_list l in
+        let arr = Array.of_list (List.map (function Var k -> Atom k | _ -> failwith "nope") l) in
         if Array.length arr != n
         then failwith "erreur"
         else substitute n arr builder
@@ -86,7 +92,7 @@ let axioms theorems = function
         | 0 -> p
         | k -> Forall (forall_builder p (k - 1)) in
         let f = free_vars (n - 1) in
-        let g = List.map (function (Var n) -> Var (n + 1)) f in
+        let g = List.map (function (Var n) -> Var (n + 1) | _ -> failwith "nope") f in
         forall_builder (Implies (
             And (phi (Zero :: f), Forall (Implies (
                 phi (Var 0 :: g),

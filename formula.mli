@@ -12,9 +12,9 @@ type formula =
   | Forall of formula
   | Exists of formula
   | Equal of (var * var)
-type axiom_request = 
+type axiom_request = private
     Peano of int
-    | private Recurrence of (int * (var list -> formula))
+    | Recurrence of (int * (var list -> formula))
     | Theorem of string;;
 type rec_builder =
   RAtom of int | RFree of int (* nth free variable in this expression, >= 1 *)
@@ -26,8 +26,12 @@ type rec_builder =
   | RExists of rec_builder
   | REqual of (var * var);;
 
+(* return the Peano variant *)
+val build_peano : int -> axiom_request
 (* return the Recurrence variant *)
-val build : rec_builder -> axiom_request
+val build_rec : rec_builder -> axiom_request
+(* return the Theorem variant *)
+val build_theorem : string -> axiom_request
 
 val axioms : (string, formula) Hashtbl.t -> axiom_request -> formula
 val substitute : formula -> formula -> formula

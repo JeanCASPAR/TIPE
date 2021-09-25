@@ -1,4 +1,6 @@
 (executable
-  (name main)
-  (modes byte exe)
-)
+ (name main)
+ (modes byte exe)
+ (libraries base)
+ (modules
+  ("main" "formula" "sequent")))

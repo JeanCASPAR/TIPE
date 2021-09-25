@@ -14,10 +14,10 @@
       # defaultPackage = self.packages.${system}.tipe;
       devShell = pkgs.mkShell {
         buildInputs = (with ocamlPackages; [
-          # pkgs.dune_2
-          # ocaml
-          # merlin
-          # ocp-indent
+          pkgs.dune_2
+          ocaml
+          merlin
+          ocp-indent
         ]);
       };
     });
