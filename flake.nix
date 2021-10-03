@@ -18,6 +18,7 @@
           ocaml
           merlin
           ocp-indent
+          ocaml-lsp
         ]);
       };
     });

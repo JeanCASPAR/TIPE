@@ -1,4 +1,4 @@
-(* with de bruijn index for var *)
+(* with de bruijn index for Var *)
 type var =
   Var of int
   | Zero
@@ -139,6 +139,34 @@ Forall a ->
     let tmp = incr (-1) a in
     aux_substitute 0 tmp
 | _ -> failwith "not substituable";;
+
+let substitute_var idx term formula =
+    (* n : nombre de binder devant la variable
+           à substituer 
+       k : nombre de binder dans le terme devant le point actuel
+    *)
+    let rec update_term n k = function
+    | Var idy -> if idy = idx + n + k (* si on a trouvé la variable libre qu'on cherchait*)
+        then incr n k term (* on remplace idy
+        en incrémentant les variables libres de term *)
+        else Var idy
+    | Zero -> Zero
+    | Succ t -> Succ (update_term n k t)
+    |
+
+
+    in
+    let rec update_prop n k = function
+    Atom p -> Atom (update_prop n k p)
+    | Neg p -> Neg (update_prop n k p)
+    | And (p,q) -> _
+    | Or (p,q) -> _
+    | Implies (p, q) -> _
+    | Forall p -> Forall (update_prop n (k + 1) p)
+    | Exists p -> Exists (update_prop n (k + 1) p)
+    | Equal (x, y) -> Equal (update_term n k x, update_term n k y)
+    in 
+();;
 
 let display =
     (* génère l'ensemble des mots sur l'alphabet usuel, par longueurs croissantes
