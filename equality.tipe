@@ -1,0 +1,27 @@
+### EqReflProp
+Goal : forall x. (x = x).
+
+Apply Forall-R.
+Apply (EqRefl 0).
+Qed.
+
+### EqSym
+Goal : forall x. forall y. ((x = y) => (y = x)).
+
+Apply Forall-R.
+Apply Forall-R.
+Apply Impl-R.
+Apply Cut (EqSubst (x = y) (z = x)) (EqRefl 0).
+Qed.
+
+
+
+### EqTrans
+Goal : forall x. forall y. forall z ((x = y) /\ (y = z) => (x = z)).
+
+Apply Forall-R.
+Apply Forall-R.
+Apply Forall-R.
+Apply Impl-R.
+Apply And-L.
+Cut (EqSubst (y = x), (a = z)) (Cut Lemma1 Lemma2).

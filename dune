@@ -3,4 +3,4 @@
  (modes byte exe)
  (libraries)
  (modules
-  ("main" "formula" "sequent")))
+  ("main" "formula" "sequent" "parser")))
