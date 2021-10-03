@@ -35,8 +35,12 @@ type logical =
     | RExists
     | LExists of Formula.formula;;
 
+type equality = EqualityRefl of int (* Var x = Var x*)
+    | EqualitySubstitutionPrincip of (int * int * Formula.formula);; (* x = y, P[x/u] |- P[y/u]*)
+
 type inference = Theorem of Formula.axiom_request
-    | Logical of logical;;
+    | Logical of logical
+    | Equality of equality;;
 
 type proof = {
     top : (sequent * proof) list;
@@ -83,12 +87,12 @@ let rec check_proof theorems p = match p.inference with
         | _ -> failwith ("Sequent not matching : " ^ display_proof p)
         end
     | Logical LWeakening -> begin match (p.top, p.bottom) with
-        [seq, p'], {assumptions = a :: l; conclusions = d} when
+        [seq, p'], {assumptions = _ :: l; conclusions = d} when
             seq.assumptions = l && seq.conclusions = d -> check_proof theorems p'
         | _ -> failwith ("Sequent not matching : " ^ display_proof p)
         end
     | Logical RWeakening -> begin match (p.top, p.bottom) with
-        [seq, p'], {assumptions = l; conclusions = a :: d} when
+        [seq, p'], {assumptions = l; conclusions = _ :: d} when
             seq.assumptions = l && seq.conclusions = d -> check_proof theorems p'
         | _ -> failwith ("Sequent not matching : " ^ display_proof p)
         end
@@ -178,6 +182,22 @@ let rec check_proof theorems p = match p.inference with
     | Theorem req -> if p.top == []
         && p.bottom.assumptions == []
         && p.bottom.conclusions == [Formula.axioms theorems req]
+        then ()
+        else failwith ("Sequent not matching : " ^ display_proof p)
+    | Equality (EqualityRefl x) -> if p.top == []
+        && p.bottom.assumptions == []
+        && p.bottom.conclusions == [Formula.Equal (Formula.Var x, Formula.Var x)]
+        then ()
+        else failwith ("Sequent not matching : " ^ display_proof p)
+    | Equality (EqualitySubstitutionPrincip (x, y, formula)) ->
+        if p.top == []
+        && p.bottom.assumptions == [
+            Formula.Equal (Formula.Var x, Formula.Var y);
+            Formula.substitute_var 0 (Formula.Var x) formula
+        ]
+        && p.bottom.conclusions == [
+            Formula.substitute_var 0 (Formula.Var y) formula
+        ]
         then ()
         else failwith ("Sequent not matching : " ^ display_proof p)
     | _ -> failwith "dunno"

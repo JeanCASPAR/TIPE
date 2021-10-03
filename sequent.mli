@@ -31,8 +31,12 @@ type logical =
     | RExists
     | LExists of Formula.formula
 
+type equality = EqualityRefl of int (* Var x = Var x*)
+    | EqualitySubstitutionPrincip of (int * int * Formula.formula) (* x = y, P[x/u] |- P[y/u]*)
+
 type inference = Theorem of Formula.axiom_request
     | Logical of logical
+    | Equality of equality
 
 type proof = {
     top : (sequent * proof) list;

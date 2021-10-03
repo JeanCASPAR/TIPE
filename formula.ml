@@ -1,10 +1,11 @@
 (* with de bruijn index for Var *)
-type var =
+type term =
   Var of int
   | Zero
-  | Succ of var
-  | Add of (var * var)
-  | Mul of (var * var);;
+  | Succ of term
+  | Add of (term * term)
+  | Mul of (term * term);;
+
 type formula =
   Atom of int | Neg of formula
   | And of (formula * formula)
@@ -12,161 +13,150 @@ type formula =
   | Implies of (formula * formula)
   | Forall of formula
   | Exists of formula
-  | Equal of (var * var);;
-
-type axiom_request = 
-    Peano of int
-    | Recurrence of (int * (var list -> formula))
-    | Theorem of string;;
-
-let build_peano n = Peano n;;
-let build_theorem s = Theorem s;;
-
-type rec_builder =
-  RAtom of int | RFree of int (* nth free variable in this expression, >= 1 *)
-  | RNeg of rec_builder
-  | RAnd of (rec_builder * rec_builder)
-  | ROr of (rec_builder * rec_builder)
-  | RImplies of (rec_builder * rec_builder)
-  | RForall of rec_builder
-  | RExists of rec_builder
-  | REqual of (var * var);;
-
-(* TODO: trop restrectif, devrait permettre de garder des variables libres *)
-(* totalement faux, j'aurais du remplacer dans les var et pas dans les prop *)
-let build_rec builder =
-    let rec count = function
-        | RAtom _ -> 0
-        | RFree k -> k
-        | RNeg a -> count a
-        | RAnd (a, b) -> max (count a) (count b)
-        | ROr (a, b) -> max (count a) (count b)
-        | RImplies (a, b) -> max (count a) (count b)
-        | RForall a -> count a
-        | RExists a -> count a
-        | REqual _ -> 0
-    in let n = count builder in
-    let rec substitute n l = function
-        | RAtom k -> Atom k
-        | RFree k -> l.(k)
-        | RNeg a -> Neg (substitute n l a)
-        | RAnd (a, b) -> And (substitute n l a, substitute n l b)
-        | ROr (a, b) -> Or (substitute n l a, substitute n l b)
-        | RImplies (a, b) -> Implies (substitute n l a, substitute n l b)
-        | RForall a -> Forall (substitute n l a)
-        | RExists a -> Exists (substitute n l a)
-        | REqual a -> Equal a
-    in let recurrent l =
-        let arr = Array.of_list (List.map (function Var k -> Atom k | _ -> failwith "nope") l) in
-        if Array.length arr != n
-        then failwith "erreur"
-        else substitute n arr builder
-    in Recurrence (n, recurrent);;
+  | Equal of (term * term);;
 
 
-let axioms theorems = function
-    Peano 0 -> Forall (Neg (Equal (Succ (Var 0), Zero)))
-    | Peano 1 -> Forall (And (
-        Equal (Var 0, Zero),
-        Exists (Equal (Var 1, Succ (Var 0))))
-    )
-    | Peano 2 -> Forall (Forall (Implies (
-        Equal (Succ (Var 1), Succ (Var 0)),
-        Equal (Var 1, Var 0)
-    )))
-    | Peano 3 -> Forall (Equal (Add (Var 0, Zero), Var 0))
-    | Peano 4 -> Forall (Forall (Equal (
-        Add (Var 1, Succ (Var 0)),
-        Succ (Add (Var 1, Var 0))
-    )))
-    | Peano 5 -> Forall (Equal (Mul (Var 0, Zero), Zero))
-    | Peano 6 -> Forall (Forall (Equal (
-        Mul (Var 1, Succ (Var 0)),
-        Add (Mul (Var 1, Var 0), Var 1)
-    )))
-    | Recurrence (n, phi) ->
-        let rec free_vars = function
-        | 0 -> []
-        | k -> Var (n - k) :: free_vars (k - 1)
-        and forall_builder p = function
-        | 0 -> p
-        | k -> Forall (forall_builder p (k - 1)) in
-        let f = free_vars (n - 1) in
-        let g = List.map (function (Var n) -> Var (n + 1) | _ -> failwith "nope") f in
-        forall_builder (Implies (
-            And (phi (Zero :: f), Forall (Implies (
-                phi (Var 0 :: g),
-                phi (Succ (Var 0) :: g)
-            ))),
-            Forall (phi (Var 0 :: g))
-        )) n
-    | Theorem name -> Hashtbl.find theorems name
-    | _ -> raise Not_found;;
-
-let incr k =
-    (* k : de combien à augmenter *)
-    (* n : nombre de binders devant *)
-    let rec incr k n = function
-    Atom l -> if l < n then Atom l else Atom (l + k)
-    | Neg p -> Neg (incr k n p)
-    | And (p, q) -> And (incr k n p, incr k n q)
-    | Or (p, q) -> Or (incr k n p, incr k n q)
-    | Implies (p, q) -> Implies (incr k n p, incr k n q)
-    | Forall p -> Forall (incr k (n + 1) p)
-    | Exists p -> Forall (incr k (n + 1) p)
-    | Equal (x, y) -> Equal (x, y) in
-    incr k 0;;
-
-let substitute a b = match a with
-Forall a ->
-    (* n est le nombre de binders devant le terme *)
-    let rec aux_substitute n = function
-    Atom l -> if l < n
-        then Atom l (* variable liée *)
-        else if l = n (* variable à remplacer *)
-        then incr n b (* on ajouter des binders devant b
-        donc on monte les index des variables libres dans b *)
-        else Atom (l - 1) (* on enlève un binder donc les variables libres baissent *)
-    | Neg p -> Neg (aux_substitute n p)
-    | And (p, q) -> And (aux_substitute n p, aux_substitute n q)
-    | Or (p, q) -> Or (aux_substitute n p, aux_substitute n q)
-    | Implies (p, q) -> Implies (aux_substitute n p, aux_substitute n q)
-    (* On ajouter un binder donc on les variables libres sont plus hautes *)
-    | Forall p -> Forall (aux_substitute (n + 1) p)
-    | Exists p -> Exists (aux_substitute (n + 1) p)
-    | Equal (x, y) -> Equal (x, y)
-    in
-    let tmp = incr (-1) a in
-    aux_substitute 0 tmp
-| _ -> failwith "not substituable";;
-
+(* replace Var idx with term y in formula F,
+  where idx is free *)
 let substitute_var idx term formula =
     (* n : nombre de binder devant la variable
            à substituer 
        k : nombre de binder dans le terme devant le point actuel
     *)
-    let rec update_term n k = function
-    | Var idy -> if idy = idx + n + k (* si on a trouvé la variable libre qu'on cherchait*)
-        then incr n k term (* on remplace idy
+    let rec incr_term n k = function
+    Var idy -> if idy <= k
+        then Var idy (* idy est liée*)
+        else Var (idy + n) (* idy est libre et on a rajouté n binders devant *)
+    | Zero -> Zero
+    | Succ x -> Succ (incr_term n k x)
+    | Add (x, y) -> Add (incr_term n k x, incr_term n k y)
+    | Mul (x, y) -> Mul (incr_term n k x, incr_term n k y)
+
+    in let rec update_term n k = function
+    Var idy -> if idy = idx + n + k (* si on a trouvé la variable libre qu'on cherchait*)
+        then incr_term n k term (* on remplace idy
         en incrémentant les variables libres de term *)
         else Var idy
     | Zero -> Zero
-    | Succ t -> Succ (update_term n k t)
-    |
+    | Succ x -> Succ (update_term n k x)
+    | Add (x, y) -> Add (update_term n k x, update_term n k y)
+    | Mul (x, y) -> Mul (update_term n k x, update_term n k y)
+    
+    in let rec update_prop n = function
+    Atom idy -> Atom idy
+    | Neg p -> Neg (update_prop n p)
+    | And (p,q) -> And (update_prop n p, update_prop n q)
+    | Or (p,q) -> Or (update_prop n p, update_prop n q)
+    | Implies (p, q) -> Implies (update_prop n p, update_prop n q)
+    | Forall p -> Forall (update_prop (n + 1) p)
+    | Exists p -> Exists (update_prop (n + 1) p)
+    | Equal (x, y) -> Equal (update_term n 0 x, update_term n 0 y)
 
+    in update_prop 0 formula;;
 
-    in
-    let rec update_prop n k = function
-    Atom p -> Atom (update_prop n k p)
-    | Neg p -> Neg (update_prop n k p)
-    | And (p,q) -> _
-    | Or (p,q) -> _
-    | Implies (p, q) -> _
-    | Forall p -> Forall (update_prop n (k + 1) p)
-    | Exists p -> Exists (update_prop n (k + 1) p)
-    | Equal (x, y) -> Equal (update_term n k x, update_term n k y)
-    in 
-();;
+(* replace formula A with formula B in formula C
+  if A is not Atomic, user should ensure than A = B *)
+let substitute_prop idx a f =
+    let rec replace_term n k = function
+    Var idy -> if idy <= k
+        then Var idy (* la variable est liée *)
+        else Var (idy + n) (* on a rajouté n binders devant*)
+    | Zero -> Zero
+    | Succ x -> Succ (replace_term n k x)
+    | Add (x, y) -> Add (replace_term n k x, replace_term n k y)
+    | Mul (x, y) -> Mul (replace_term n k x, replace_term n k y)
+
+    in let rec replace_prop n k = function
+    Atom idy -> Atom idy
+    | Neg p -> Neg (replace_prop n k p)
+    | And (p, q) -> And (replace_prop n k p, replace_prop n k q)
+    | Or (p, q) -> Or (replace_prop n k p, replace_prop n k q)
+    | Implies (p, q) -> Implies (replace_prop n k p, replace_prop n k q)
+    | Forall p -> Forall (replace_prop n (k + 1) p)
+    | Exists p -> Exists (replace_prop n (k + 1) p)
+    | Equal (x, y) -> Equal (replace_term n k x, replace_term n k y)
+
+    in let rec find_prop n = function
+    Atom idy -> if idy = idx
+        then replace_prop n 0 a (* si on a trouvé un atome à remplacer *)
+        else Atom idy
+    | Neg p -> Neg (find_prop n p)
+    | And (p, q) -> And (find_prop n p, find_prop n q)
+    | Or (p, q) -> Or (find_prop n p, find_prop n q)
+    | Implies (p, q) -> Implies (find_prop n p, find_prop n q)
+    | Forall p -> Forall (find_prop (n + 1) p)
+    | Exists p -> Exists (find_prop (n + 1) p)
+    | Equal (x, y) -> Equal (x, y)
+    
+    in find_prop 0 f;;
+
+type axiom_request = 
+    Peano of int
+    | Recurrence of formula
+    | Theorem of string;;
+
+let axioms theorems = function
+    Peano 1 -> Forall (Neg (Equal (Succ (Var 0), Zero)))
+    | Peano 21 -> Forall (And (
+        Equal (Var 0, Zero),
+        Exists (Equal (Var 1, Succ (Var 0))))
+    )
+    | Peano 3 -> Forall (Forall (Implies (
+        Equal (Succ (Var 1), Succ (Var 0)),
+        Equal (Var 1, Var 0)
+    )))
+    | Peano 4 -> Forall (Equal (Add (Var 0, Zero), Var 0))
+    | Peano 5 -> Forall (Forall (Equal (
+        Add (Var 1, Succ (Var 0)),
+        Succ (Add (Var 1, Var 0))
+    )))
+    | Peano 6 -> Forall (Equal (Mul (Var 0, Zero), Zero))
+    | Peano 7 -> Forall (Forall (Equal (
+        Mul (Var 1, Succ (Var 0)),
+        Add (Mul (Var 1, Var 0), Var 1)
+    )))
+    | Recurrence formula -> begin
+        let rec count_free_var_term n = function
+        | Var idx -> if idx <= n
+            then 0
+            else idx + 1 (* we start at 1 since 0 means no free variable *)
+        | Zero -> 0
+        | Succ x -> count_free_var_term n x
+        | Add (x, y) -> max (count_free_var_term n x) (count_free_var_term n y)
+        | Mul (x, y) -> max (count_free_var_term n x) (count_free_var_term n y)
+        
+        in let rec count_free_var_prop n = function
+            | Atom _ -> 0
+            | Neg p -> count_free_var_prop n p
+            | And (p, q) -> max (count_free_var_prop n p) (count_free_var_prop n q)
+            | Or (p, q) -> max (count_free_var_prop n p) (count_free_var_prop n q)
+            | Implies (p, q) -> max (count_free_var_prop n p) (count_free_var_prop n q)
+            | Forall p -> count_free_var_prop (n + 1) p
+            | Exists p -> count_free_var_prop (n + 1) p
+            | Equal (x, y) -> max (count_free_var_term n x) (count_free_var_term n y)
+        
+        in let n = count_free_var_prop 0 formula
+
+        in if n == 0
+        then formula (* aucune variable libre*)
+        else begin
+            let n = n - 1 (* indice de la variable libre de plus haut rang,
+                et nombre de variables libres != 0 *)
+            in let f = substitute_var n Zero formula
+            and g = substitute_var n (Var 0) formula
+            in let h = Forall (Implies (
+                g,
+                substitute_var n (Succ (Var 0)) formula
+            ))
+            in let i = Implies (And (f, h), Forall h)
+            in let rec iterate f x = function
+            | 0 -> x
+            | k -> iterate f (f x) (k - 1)
+            in iterate (fun p -> Forall p) i n
+        end
+    end
+    | Theorem name -> Hashtbl.find theorems name
+    | _ -> raise Not_found;;
 
 let display =
     (* génère l'ensemble des mots sur l'alphabet usuel, par longueurs croissantes
