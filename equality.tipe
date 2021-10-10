@@ -1,27 +1,67 @@
-### EqReflProp
-Goal : forall x. (x = x).
+/// Comment
 
-Apply Forall-R.
-Apply (EqRefl 0).
+### EqReflProp
+Theorem : forall x. (x = x).
+
+Forall-R.
+EqRefl 0.
 Qed.
 
 ### EqSym
-Goal : forall x. forall y. ((x = y) => (y = x)).
+Theorem : forall x. forall y. ((x = y) => (y = x)).
 
-Apply Forall-R.
-Apply Forall-R.
-Apply Impl-R.
-Apply Cut (EqSubst (x = y) (z = x)) (EqRefl 0).
+Forall-R.
+Forall-R.
+Impl-R.
+Cut (EqSubst (x = y) (z = x)) (EqRefl 0).
 Qed.
 
+### Lemma1A
+Sequent : x = y |- x = y, y = x.
 
+Weakening-R.
+Axiom.
+Qed.
+
+### Lemma1B
+Sequent : y = x, x = y |- y = x.
+
+Weakening-L.
+Axiom.
+Qed.
+
+### Lemma1
+Sequent : (x = y) => (y= x), x = y |- y = x.
+
+Impl-L Lemma1A Lemma1B.
+Qed.
+
+### Lemma2A
+Sequent : forall a. forall b. ((a = b) => (b = a)) |- forall b. ((x = b) => (b = x)).
+
+Forall-D.
+Axiom.
+Qed.
+
+### Lemma2B
+Sequent : forall b. ((x = b) => (b = x) |- (x = y) => (y = x).
+
+Forall-D.
+Axiom.
+Qed.
+
+### Lemma2
+Theorem : (x = y) => (y = x).
+
+Cut (Cut EqSym Lemma2A) Lemma2B.
+Qed.
 
 ### EqTrans
-Goal : forall x. forall y. forall z ((x = y) /\ (y = z) => (x = z)).
+Theorem : forall x. forall y. forall z ((x = y) /\ (y = z) => (x = z)).
 
-Apply Forall-R.
-Apply Forall-R.
-Apply Forall-R.
-Apply Impl-R.
-Apply And-L.
-Cut (EqSubst (y = x), (a = z)) (Cut Lemma1 Lemma2).
+Forall-R.
+Forall-R.
+Forall-R.
+Impl-R.
+And-L.
+Cut (EqSubst (y = x) (a = z)) (Cut Lemma1 Lemma2).
