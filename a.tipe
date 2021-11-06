@@ -1,0 +1,6 @@
+s = {* | ¤}
+
+\x:A.B : forall x:A.B
+B : s --> forall x:A.B : s
+
+def a(x1:A1, x2:A2, ...) := (expr | @) : expr

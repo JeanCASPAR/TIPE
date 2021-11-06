@@ -1,6 +1,11 @@
+(ocamllex "lexer")
+
+(menhir
+ (modules "parser"))
+
 (executable
  (name main)
  (modes byte exe)
  (libraries)
  (modules
-  ("main" "formula" "sequent" "parser")))
+  ("main" "lambda" "lexer" "parser" "syntax")))

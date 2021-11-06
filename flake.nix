@@ -19,6 +19,7 @@
           merlin
           ocp-indent
           ocaml-lsp
+          menhir
         ]);
       };
     });

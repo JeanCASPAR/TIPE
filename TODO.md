@@ -1,3 +1,8 @@
-* Traiter Sequent.\[L|R\]\[Forall|Exists\] dans Formula.check_proof
+# de Bruijn, 1970
 
-* Substitution de formules à une formule atomique (ajouter un outil qui fournit un terme de preuve à vérifier)
+# 28/10/2021
+- Renommer interpreter en state
+- Finir substitute
+- Finir check
+- Parser + Lexer
+- Tests
