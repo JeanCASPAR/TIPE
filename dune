@@ -6,6 +6,8 @@
 (executable
  (name main)
  (modes byte exe)
- (libraries)
+ (librariess)
+ (inline_tests)
+ (preprocess (pss ppx_inline_test))
  (modules
   ("main" "lambda" "lexer" "parser" "syntax")))

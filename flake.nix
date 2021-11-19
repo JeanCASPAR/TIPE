@@ -20,6 +20,7 @@
           ocp-indent
           ocaml-lsp
           menhir
+          ppx_inline_test
         ]);
       };
     });
