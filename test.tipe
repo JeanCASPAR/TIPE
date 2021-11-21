@@ -1,3 +1,4 @@
-def N[] := @ : *;
-def O[] := @ : N[];
-def S[] := @ : \(n:N[]).N[];
+def N := @ : *;
+def O := @ : N;
+def S := @ : \(n:N).N;
+def U := S O : N;

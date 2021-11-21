@@ -200,16 +200,3 @@ let empty = {
 }
 
 let show def = "name = " ^ def.name ^ ";"
-
-
-module Test = struct
-  let check_subst_var =
-    let v0 = (0, Sort Type) in
-    let v1 = (1, Sort Type) in
-    let f0 = Abstraction (v0, Var v0) in
-    let f1 = Abstraction (v1, Var v0) in
-    let ty = (2, Sort Type) in
-    substitute v0 (Var ty) (Var v0) == (Var ty)
-    && substitute v0 (Var ty) f1 = Abstraction (v1, Var ty)
-    && substitute v1 (Var ty) f0 = Abstraction (v0, Var v0)
-end

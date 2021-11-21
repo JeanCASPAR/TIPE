@@ -1,62 +1,58 @@
 %{
 
-open Syntax
+open SyntaxD
 
 %}
 
-%token<string> IDENT (* alphanumerical ascii, starts with a letter *)
+%token<string> VAR_IDENT (* alphanumerical ascii, starts with a lowercase letter *)
+%token<string> CST_IDENT (* alphanumerical ascii, starts with an uppercase letter *)
 %token DEF (* def *)
 %token COMMENT (* # *)
-%token TYPE_SORT (* * *)
-%token KIND_SORT (* ¤ *)
+%token TYPE (* * *)
+%token KIND (* ¤ *)
 %token AXIOM (* @ *)
 %token DOT (* . *)
 %token COLON (* : *)
-%token COMMA (* , *)
 %token LAMBDA (* \ *)
 %token PRODUCT (* /\ *)
 %token ASSIGN (* := *)
 %token LPAR (* ( *)
 %token RPAR (* ) *)
-%token LBRA (* [ *)
-%token RBRA (* ] *)
 %token SEMICOLON (* ; *)
 %token EOF
 
-%start<Syntax.tok_definition list> parse_file
+%start<SyntaxD.tok_def list> parse_file
 
-%nonassoc IDENT TYPE_SORT KIND_SORT DOT LAMBDA PRODUCT LPAR
+%nonassoc VAR_IDENT CST_IDENT TYPE KIND LAMBDA PRODUCT LPAR
 %left APP
+%left DOT
 
 %%
 
 expr:
   | LPAR ; e = expr; RPAR { e }
-  | TYPE_SORT { Sort Lambda.Type }
-  | KIND_SORT { Sort Lambda.Kind }
+  | TYPE { Universe LambdaD.Type }
+  | KIND { Universe LambdaD.Kind }
   | e1 = expr; e2 = expr; %prec APP { Apply (e1, e2) }
-  | LAMBDA ; v = var_intro ; DOT ; e = expr
+  | LAMBDA ; v = var_intro ; DOT ; e = expr %prec DOT
     { let (s, ty) = v in Abstraction (s, ty, e) }
-  | PRODUCT ; v = var_intro; DOT ; e = expr
+  | PRODUCT ; v = var_intro; DOT ; e = expr %prec DOT
     { let (s, ty) = v in ProductType (s, ty, e) }
-  | c = IDENT; LBRA ; l  = rev(separated_list(COMMA, expr)) ; RBRA {
-      Constant (c, l)
-  }
-  | s = IDENT { Var s }
+  | c = CST_IDENT { Constant c }
+  | s = VAR_IDENT { Var s }
 
 var_intro:
-  LPAR ; s = IDENT ; COLON ; ty = expr ; RPAR { (s, ty) }
+  LPAR ; s = VAR_IDENT ; COLON ; ty = expr ; RPAR { (s, ty) }
 
 expr_or_axiom:
-  | e = expr; { Some e }
-  | AXIOM; { None }
+  | e = expr { Some e }
+  | AXIOM { None }
 
 def:
-  DEF ; c = IDENT ; LBRA ; l = rev(separated_list(COMMA, var_intro)) ; RBRA ; ASSIGN ;
+  DEF ; c = CST_IDENT ; ASSIGN ;
   e = expr_or_axiom ; COLON ; ty = expr ; SEMICOLON {{
       name = c;
-      var = l;
-      expr = e;
+      body = e;
       ty = ty;
   }}
 

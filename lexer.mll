@@ -8,19 +8,17 @@ rule token = parse
   | [' ' '\t' '\n' '\r'] { token lexbuf } (* skip whitespaces *)
   | "def" { DEF }
   | "#" { COMMENT }
-  | "*" { TYPE_SORT }
-  | "¤" { KIND_SORT }
+  | "*" { TYPE }
+  | "¤" { KIND }
   | "@" { AXIOM }
   | "." { DOT }
   | ":=" { ASSIGN }
   | ":" { COLON }
-  | "," { COMMA }
   | "\\" { LAMBDA }
   | "/\\" { PRODUCT }
   | "(" { LPAR }
   | ")" { RPAR }
-  | "[" { LBRA }
-  | "]" { RBRA }
   | ";" { SEMICOLON }
-  | ['a'-'z' 'A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']* as id { IDENT id }
+  | ['a'-'z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']* as id { VAR_IDENT id }
+  | ['A'-'Z'] ['a'-'z' 'A'-'Z' '0'-'9' '_']* as id { CST_IDENT id }
   | eof { EOF }
