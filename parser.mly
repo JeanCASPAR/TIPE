@@ -23,16 +23,16 @@ open SyntaxD
 
 %start<SyntaxD.tok_def list> parse_file
 
+%right DOT
 %nonassoc VAR_IDENT CST_IDENT TYPE KIND LAMBDA PRODUCT LPAR
 %left APP
-%left DOT
 
 %%
 
 expr:
   | LPAR ; e = expr; RPAR { e }
-  | TYPE { Universe LambdaD.Type }
-  | KIND { Universe LambdaD.Kind }
+  | TYPE { Sort LambdaD.Type }
+  | KIND { Sort LambdaD.Kind }
   | e1 = expr; e2 = expr; %prec APP { Apply (e1, e2) }
   | LAMBDA ; v = var_intro ; DOT ; e = expr %prec DOT
     { let (s, ty) = v in Abstraction (s, ty, e) }

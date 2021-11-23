@@ -10,7 +10,7 @@
           else None, n+1
     in fst @@ aux l
 let flip f b a = f a b
-(*let idx_from_end l n = find_with_idx (fun idx _ -> idx - 1 == n) l
+(*let idx_from_end l n = find_with_idx (fun idx _ -> idx - 1 = n) l
     |> Option.map fst*)
 let rec remove_first pred = function
 | h :: t -> if pred h
@@ -77,7 +77,7 @@ let rec typing (machine : interpreter) = function
   | ProductType _ -> Sort Type
   | Constant (c, l) ->
     (* Safe because of well-formedness of the term *)
-    let def = List.find (fun def -> def.name == c) machine.definitions
+    let def = List.find (fun def -> def.name = c) machine.definitions
     (* We use fold_right in order to substitute x1 in ty and in x2, ..., xn, etc *)
     in List.fold_right2 substitute def.var l def.ty
 
@@ -90,7 +90,7 @@ let rec unfold (machine : interpreter) = function
 | Abstraction ((v, ty), e) -> Abstraction ((v, unfold machine ty), unfold machine e)
 | ProductType ((v, ty), e) -> ProductType ((v, unfold machine ty), unfold machine e)
 | Constant (c, l) ->
-  let opt = find_with_idx (fun _ def -> def.name == c) machine.definitions
+  let opt = find_with_idx (fun _ def -> def.name = c) machine.definitions
   in let l' = List.map (unfold machine) l in
   match opt with
     | None -> Constant (c, l')
@@ -103,7 +103,7 @@ let rec unfold (machine : interpreter) = function
 juste de vérifier qu'il correspond bien *)
 let rec check (machine : interpreter) = function
 | Var (x, ty) ->
-  let ctx, opt = remove_first ((==) (x, ty)) machine.context in
+  let ctx, opt = remove_first ((=) (x, ty)) machine.context in
   let tmp_machine = match opt with
     | None -> failwith ("unknown name " ^ string_of_int x)
     | Some _ ->
@@ -159,14 +159,14 @@ let rec check (machine : interpreter) = function
   then
     failwith "a variable type should have a sort for type"
 | Constant (c, l) -> (* we assume the constant is correctly defined and unrolled if needed *)
-  let def = match find_with_idx (fun _ def -> def.name == c) machine.definitions with
+  let def = match find_with_idx (fun _ def -> def.name = c) machine.definitions with
     | None -> failwith ("unknown constant " ^ c)
     | Some (def, _) -> def
   in let id x = x in
     let f = List.fold_left2 (
     fun f (t : expr) (v : var) ->
   
-      if typing machine (f t) != f (snd v)
+      if typing machine (f t) <> f (snd v)
       then failwith "provided expression has not correct type";
 
       fun x -> substitute v (f x) t
@@ -175,7 +175,7 @@ let rec check (machine : interpreter) = function
     check machine (Sort Type) (* checks if the context is well-formed *)
 
 let rec check_def (machine : interpreter) (assign : definition) =
-  if List.exists (fun def -> def.name == assign.name) machine.definitions
+  if List.exists (fun def -> def.name = assign.name) machine.definitions
   then failwith ("Name " ^ assign.name ^ " already used");
 
   let tmp_machine = List.fold_right (flip check_def) machine.definitions machine in
@@ -183,7 +183,7 @@ let rec check_def (machine : interpreter) (assign : definition) =
   begin match assign.expr with
     | None -> ()
     | Some e -> ignore (check tmp_machine e);
-      if unfold tmp_machine (typing tmp_machine e) != unfold tmp_machine assign.ty
+      if unfold tmp_machine (typing tmp_machine e) <> unfold tmp_machine assign.ty
       then
         failwith "Provided type do not match"
   end;

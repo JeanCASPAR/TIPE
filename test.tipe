@@ -1,4 +1,6 @@
 def N := @ : *;
 def O := @ : N;
-def S := @ : \(n:N).N;
+def S := @ : /\(n:N).N;
 def U := S O : N;
+
+def F := \(x : N). S x : /\(x : N). N;

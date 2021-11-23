@@ -1,6 +1,3 @@
-(*open LambdaD;;
-open SyntaxD;;*)
-
 let perform path f =
   let ic = open_in path in
   let res = f ic in
@@ -46,15 +43,18 @@ let transform l =
     def :: aux (SyntaxD.AssocTable.add name i cst_table) (i + 1) tl
   in aux SyntaxD.AssocTable.empty 0 l;;
 
-let check_def state {LambdaD.body=b; LambdaD.ty = ty} =
+let check_def state {LambdaD.body = b; LambdaD.ty = ty} =
   LambdaD.show state b ty;
   let ty = LambdaD.unfold state ty in
   LambdaD.check state ty;
-  Option.map (fun t ->
-    let t = LambdaD.unfold state t in
-    LambdaD.check state t;
-    if LambdaD.typing state t != ty
-    then failwith ""
+  Option.map (fun term ->
+    let term = LambdaD.unfold state term in
+    LambdaD.check state term;
+    let real_ty = LambdaD.typing state term in
+    if real_ty <> ty
+    then raise (LambdaD.Error (LambdaD.TypesDoNotMatch (real_ty, ty,
+      "term x = " ^ LambdaD.show_term term ^ " : " ^ LambdaD.show_term real_ty ^
+      " is not of the provided type " ^ LambdaD.show_term ty)))
   ) b |> ignore
 
 let check_defs defs =
@@ -76,10 +76,50 @@ let main () =
         ) in def_list
       with
         | Failure s -> print_endline ("ERROR: " ^ s); []
-    ) |> List.flatten |> List.map (fun ({SyntaxD.name=s} as def) ->
+    ) |> List.flatten |> List.map (fun ({SyntaxD.name = s} as def) ->
       print_endline s; def
     ) |> transform in
     check_defs defs;;
 
 Printexc.record_backtrace true;;
-main ();;
+let catch f =
+  try
+    f ()
+  with
+    | LambdaD.Error (LambdaD.NotTypable (t, s)) -> print_endline s;
+      print_endline (LambdaD.show_term t)
+    | LambdaD.Error (LambdaD.IsNotASort (t, ty)) -> print_endline
+      (LambdaD.show_term t ^ " : " ^ LambdaD.show_term ty ^ " should be :  s")
+    | LambdaD.Error (LambdaD.ConstantOutOfBound k) -> print_endline
+      ("Constant " ^ string_of_int k ^ " is unknown")
+    | LambdaD.Error (LambdaD.TypesDoNotMatch (_, _, s)) -> print_endline s
+    | LambdaD.Error (NotClosedTerm k) -> print_endline
+      ("Variable " ^ string_of_int k ^ " is free")
+
+module Test = struct
+  let n = {
+    LambdaD.ty = LambdaD.Sort LambdaD.Type;
+    LambdaD.body = None;
+  }
+  let o = {
+    LambdaD.ty = LambdaD.Constant 0;
+    LambdaD.body = None;
+  }
+  let s = {
+    LambdaD.ty = LambdaD.ProductType (LambdaD.Constant 0, LambdaD.Constant 0);
+    LambdaD.body = None;
+  }
+  let u = {
+    LambdaD.ty = LambdaD.Constant 0;
+    LambdaD.body = Some (LambdaD.Apply (LambdaD.Constant 2, LambdaD.Constant 1));
+  }
+  let state = {
+    LambdaD.vars = [];
+    LambdaD.defs = [|
+      n; o; s
+    |];
+  }
+  let test () = check_def state u
+end;;
+
+catch main;;

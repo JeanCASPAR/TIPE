@@ -2,7 +2,7 @@ module AssocTable = Map.Make(String)
 
 type tok_term =
   | Var of string
-  | Universe of LambdaD.universe
+  | Sort of LambdaD.sort
   | Apply of tok_term * tok_term
   | Abstraction of string * tok_term * tok_term
   | ProductType of string * tok_term * tok_term
@@ -19,7 +19,7 @@ let translate_term cst_table t =
   (* current is the next free binding index *)
   let rec aux n var_table = function
   | Var s -> LambdaD.Var (AssocTable.find s var_table) (* fail if the term is not closed *)
-  | Universe u -> LambdaD.Universe u
+  | Sort u -> LambdaD.Sort u
   | Apply (a, b) ->
     let a = aux n var_table a in
     let b = aux n var_table b in
@@ -40,21 +40,47 @@ let translate_term cst_table t =
   in let t = aux 0 AssocTable.empty t
   in t
 
+let rec show_syntax_term = function
+| Var s -> s
+| Sort u -> LambdaD.show_term (LambdaD.Sort u)
+| Apply (a, b) -> show_syntax_term a ^ " " ^ show_syntax_term b
+| Abstraction (x, a, b) ->
+    "(\\(" ^ x ^ " : " ^ show_syntax_term a ^ ") . " ^ show_syntax_term b ^ ")"
+| ProductType (x, a, b) ->
+  "(/\\(" ^ x ^ " : " ^ show_syntax_term a ^ ") . " ^ show_syntax_term b ^ ")"
+| Constant s -> "[" ^ s ^ "]"
+let _ = show_syntax_term
+
 let translate_def cst_table def =
+  (* debugging purpose
+  AssocTable.iter (fun s i -> print_endline (s ^ " : " ^ string_of_int i)) cst_table;
+  let _ = Option.map (fun t -> print_endline (show_syntax_term t)) def.body in
+  print_endline (show_syntax_term def.ty);
+  print_newline ();*)
   let ty = translate_term cst_table def.ty
   and body = Option.map (translate_term cst_table) def.body in
   (def.name, { LambdaD.body = body; LambdaD.ty = ty})
 
 module Test = struct
-  let test_translate () =
+  let test_translate =
     let t = translate_term (AssocTable.singleton "C" 0)
-      (Abstraction ("z", Constant "C", (Apply (
+      (Abstraction ("a", Constant "C", Apply (
         Abstraction ("x", Constant "C", Abstraction ("y", Constant "C", Apply (Var "y", Abstraction ("z", Constant "C", Var "z")))),
         (Abstraction ("x", Constant "C", Var "x"))
-      )))) in
+      ))) in
     assert (t = LambdaD.Abstraction (LambdaD.Constant 0, LambdaD.Apply (
       LambdaD.Abstraction (LambdaD.Constant 0, LambdaD.Abstraction (LambdaD.Constant 0,
         Apply (LambdaD.Var 1, LambdaD.Abstraction (LambdaD.Constant 0, LambdaD.Var 1)))),
-      LambdaD.Abstraction (LambdaD.Constant 0, Apply (LambdaD.Var 2, LambdaD.Var 1))
+      LambdaD.Abstraction (LambdaD.Constant 0, LambdaD.Var 1)
+    )));
+    let t = translate_term (AssocTable.singleton "N" 0
+      |> AssocTable.add "O" 1
+      |> AssocTable.add "S" 2
+      |> AssocTable.add "U" 3
+    ) (Abstraction ("x", Constant "N", Apply (
+      Constant "S", Var "x"
+    ))) in
+    assert (t = LambdaD.Abstraction (LambdaD.Constant 0, LambdaD.Apply (
+      LambdaD.Constant 2, LambdaD.Var 1
     )))
 end

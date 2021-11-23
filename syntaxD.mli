@@ -2,7 +2,7 @@ module AssocTable: Map.S with type key = string
 
 type tok_term =
   | Var of string
-  | Universe of LambdaD.universe
+  | Sort of LambdaD.sort
   | Apply of tok_term * tok_term
   | Abstraction of string * tok_term * tok_term
   | ProductType of string * tok_term * tok_term
