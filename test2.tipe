@@ -1,1 +1,2 @@
-def Func := \(A : *). \(B : *). /\(a : A). B : *;
+
+def Rec := @ : /\(c : *)./\(p : Func N c).Func (And c (Func N (Func c c))) (Func N c);

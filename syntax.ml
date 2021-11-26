@@ -1,84 +1,86 @@
-module VarAssocMap = Map.Make(String)
-type syntax_error = UnknownVariable of string | Eof
-exception SyntaxError of syntax_error
+module AssocTable = Map.Make(String)
 
-type tok_expr =
-  Var of string
+type tok_term =
+  | Var of string
   | Sort of Lambda.sort
-  | Apply of (tok_expr * tok_expr) (* M N *)
-  | Abstraction of (string * tok_expr * tok_expr) (* (x, A, m) = \x : A. m; m : * *)
-  | ProductType of (string * tok_expr * tok_expr) (* (x, A, B) = /\x : A. B; B : ¤ *)
-  | Constant of (string * tok_expr list) (* C[Un, ..., ... U1] *)
+  | Apply of tok_term * tok_term
+  | Abstraction of string * tok_term * tok_term
+  | ProductType of string * tok_term * tok_term
+  | Constant of string
 
-type tok_definition = {
+type tok_def = {
   name : string;
-  (* liste (x_n : A_n) :: (x_(n-1) : A_(n-1)) ... (x_1 : A_1) :: [] *)
-  (* chaque A_k et x_k peut dépendre des x_l, l < k *)
-  var : (string * tok_expr) list;
-  expr : tok_expr option; (* None is @ *)
-  ty : tok_expr;
+  body : tok_term option;
+  ty : tok_term;
 }
 
-(* let rec convert (new_idx : int) (map : (int * expr) VarAssocMap.t) :
-    tok_expr -> int * Lambda.Expr *)
-let rec convert new_idx map = function
-  | Var name -> begin match VarAssocMap.find_opt name map with
-    | None -> raise (SyntaxError (UnknownVariable name))
-    | Some v -> (new_idx, Lambda.Var v)
-    end
-  | Sort s -> (new_idx, Lambda.Sort s)
-  | Apply (e1, e2) ->
-    let (new_idx, f1) = convert new_idx map e1 in
-    let (new_idx, f2) = convert new_idx map e2 in
-    (new_idx, Lambda.Apply (f1, f2))
-  | Abstraction (name, ty, e) ->
-    let (new_idx, ty) = convert (new_idx) map ty in
-    let id = new_idx in
-    let map = VarAssocMap.add name (id, ty) map in
-    let (new_idx, e) = convert (new_idx + 1) map e in
-    (new_idx, Lambda.Abstraction ((id, ty), e))
-  | ProductType (name, ty, e) ->
-    let (new_idx, ty) = convert (new_idx) map ty in
-    let id = new_idx in
-    let map = VarAssocMap.add name (id, ty) map in
-    let (new_idx, e) = convert (new_idx + 1) map e in
-    (new_idx, Lambda.ProductType ((id, ty), e))
-  | Constant (c, l) ->
-    let (new_idx, l) = List.fold_left (
-      fun (new_idx, t) e ->
-        let (new_idx, e) = convert new_idx map e in
-        (new_idx, e :: t)
-    ) (new_idx, []) l in
-    (new_idx, Lambda.Constant (c, l))
+let translate_term cst_table t =
+  (* n is the number of binders already in scope *)
+  (* current is the next free binding index *)
+  let rec aux n var_table = function
+  | Var s -> Lambda.Var (AssocTable.find s var_table) (* fail if the term is not closed *)
+  | Sort u -> Lambda.Sort u
+  | Apply (a, b) ->
+    let a = aux n var_table a in
+    let b = aux n var_table b in
+    Lambda.Apply (a, b)
+  | Abstraction (x, a, b) ->
+    let a = aux n var_table a in
+    let var_table = var_table |> AssocTable.map (fun k -> k + 1)
+    |> AssocTable.add x 1 in
+    let b = aux (n + 1) var_table b in
+    Lambda.Abstraction (a, b)
+  | ProductType (x, a, b) ->
+    let a = aux n var_table a in
+    let var_table = var_table |> AssocTable.map (fun k -> k + 1)
+    |> AssocTable.add x 1 in
+    let b = aux (n + 1) var_table b in
+    Lambda.ProductType (a, b)
+  | Constant s -> Lambda.Constant (AssocTable.find s cst_table) (* fail if the constant is not previously defined *)
+  in let t = aux 0 AssocTable.empty t
+  in t
 
-let convert_def new_idx def =
-  let (new_idx, v, map) = List.fold_left (
-    fun (new_idx, t, map) (name, ty) ->
-      let (new_idx, ty) = convert new_idx map ty in
-      let map = VarAssocMap.add name (new_idx, ty) map in
-      (new_idx + 1, (new_idx, ty) :: t, map)
-  ) (new_idx, [], VarAssocMap.empty) def.var in
-  let (new_idx, ty) = convert new_idx map def.ty in
-  let (new_idx, e) = match def.expr with
-    | Some e ->
-        let (new_idx, e) = convert new_idx map e
-        in (new_idx, Some e)
-    | None -> (new_idx, None) in
+let rec show_syntax_term = function
+| Var s -> s
+| Sort u -> Lambda.show_term (Lambda.Sort u)
+| Apply (a, b) -> show_syntax_term a ^ " " ^ show_syntax_term b
+| Abstraction (x, a, b) ->
+    "(\\(" ^ x ^ " : " ^ show_syntax_term a ^ ") . " ^ show_syntax_term b ^ ")"
+| ProductType (x, a, b) ->
+  "(/\\(" ^ x ^ " : " ^ show_syntax_term a ^ ") . " ^ show_syntax_term b ^ ")"
+| Constant s -> "[" ^ s ^ "]"
+let _ = show_syntax_term
 
-  (
-    new_idx,
-    {
-      Lambda.name = def.name;
-      Lambda.var = v;
-      Lambda.expr = e;
-      Lambda.ty = ty;
-    }
-  )
+let translate_def cst_table def =
+  (* debugging purpose
+  AssocTable.iter (fun s i -> print_endline (s ^ " : " ^ string_of_int i)) cst_table;
+  let _ = Option.map (fun t -> print_endline (show_syntax_term t)) def.body in
+  print_endline (show_syntax_term def.ty);
+  print_newline ();*)
+  let ty = translate_term cst_table def.ty
+  and body = Option.map (translate_term cst_table) def.body in
+  (def.name, { Lambda.body = body; Lambda.ty = ty})
 
-let convert_list_def l = snd (
-  List.fold_right (
-    fun def (new_idx, t) ->
-      let (new_idx, def) = convert_def new_idx def
-      in (new_idx, def :: t)
-  ) l (0, [])
-)
+module Test = struct
+  let test_translate =
+    let t = translate_term (AssocTable.singleton "C" 0)
+      (Abstraction ("a", Constant "C", Apply (
+        Abstraction ("x", Constant "C", Abstraction ("y", Constant "C", Apply (Var "y", Abstraction ("z", Constant "C", Var "z")))),
+        (Abstraction ("x", Constant "C", Var "x"))
+      ))) in
+    assert (t = Lambda.Abstraction (Lambda.Constant 0, Lambda.Apply (
+      Lambda.Abstraction (Lambda.Constant 0, Lambda.Abstraction (Lambda.Constant 0,
+        Apply (Lambda.Var 1, Lambda.Abstraction (Lambda.Constant 0, Lambda.Var 1)))),
+      Lambda.Abstraction (Lambda.Constant 0, Lambda.Var 1)
+    )));
+    let t = translate_term (AssocTable.singleton "N" 0
+      |> AssocTable.add "O" 1
+      |> AssocTable.add "S" 2
+      |> AssocTable.add "U" 3
+    ) (Abstraction ("x", Constant "N", Apply (
+      Constant "S", Var "x"
+    ))) in
+    assert (t = Lambda.Abstraction (Lambda.Constant 0, Lambda.Apply (
+      Lambda.Constant 2, Lambda.Var 1
+    )))
+end

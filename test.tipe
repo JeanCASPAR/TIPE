@@ -3,4 +3,10 @@ def O := @ : N;
 def S := @ : /\(n:N).N;
 def U := S O : N;
 
-def F := \(x : N). S x : /\(x : N). N;
+def Succ := \(x : N). S x : /\(x : N). N;
+def Empty := /\(a : *). a : *;
+def Func := \(a : *).\(b : *)./\(x : a).b : /\(a : *)./\(b : *).*;
+def T := Succ : Func N N;
+def And := \(a : *).\(b : *)./\(c : *). Func a (Func b c) : /\(a : *)./\(b : *).*;
+def Id := \(a : *).\(x : a).x : /\(a : *). /\(x : a).a;
+def Absurd := \(a : *).\(e : Empty). e a : /\(a : *)./\(e : Empty).a;

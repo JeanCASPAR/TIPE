@@ -1,6 +1,6 @@
 %{
 
-open SyntaxD
+open Syntax
 
 %}
 
@@ -21,7 +21,7 @@ open SyntaxD
 %token SEMICOLON (* ; *)
 %token EOF
 
-%start<SyntaxD.tok_def list> parse_file
+%start<Syntax.tok_def list> parse_file
 
 %right DOT
 %nonassoc VAR_IDENT CST_IDENT TYPE KIND LAMBDA PRODUCT LPAR
@@ -31,8 +31,8 @@ open SyntaxD
 
 expr:
   | LPAR ; e = expr; RPAR { e }
-  | TYPE { Sort LambdaD.Type }
-  | KIND { Sort LambdaD.Kind }
+  | TYPE { Sort Lambda.Type }
+  | KIND { Sort Lambda.Kind }
   | e1 = expr; e2 = expr; %prec APP { Apply (e1, e2) }
   | LAMBDA ; v = var_intro ; DOT ; e = expr %prec DOT
     { let (s, ty) = v in Abstraction (s, ty, e) }

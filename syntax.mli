@@ -1,20 +1,21 @@
-type tok_expr =
-  Var of string
-  | Sort of Lambda.sort
-  | Apply of (tok_expr * tok_expr) (* M N *)
-  | Abstraction of (string * tok_expr * tok_expr) (* (x, A, m) = \x : A. m; m : * *)
-  | ProductType of (string * tok_expr * tok_expr) (* (x, A, B) = /\x : A. B; B : ¤ *)
-  | Constant of (string * tok_expr list) (* C[Un, ..., ... U1] *)
+module AssocTable: Map.S with type key = string
 
-type tok_definition = {
+type tok_term =
+  | Var of string
+  | Sort of Lambda.sort
+  | Apply of tok_term * tok_term
+  | Abstraction of string * tok_term * tok_term
+  | ProductType of string * tok_term * tok_term
+  | Constant of string
+
+type tok_def = {
   name : string;
-  (* liste (x_n : A_n) :: (x_(n-1) : A_(n-1)) ... (x_1 : A_1) :: [] *)
-  (* chaque A_k et x_k peut dépendre des x_l, l < k *)
-  var : (string * tok_expr) list;
-  expr : tok_expr option; (* None is @ *)
-  ty : tok_expr;
+  body : tok_term option;
+  ty : tok_term;
 }
 
-type syntax_error = UnknownVariable of string | Eof
-exception SyntaxError of syntax_error
-val convert_list_def : tok_definition list -> Lambda.definition list
+(* the AssocTable contains the constant bindings *)
+val translate_term : int AssocTable.t -> tok_term -> Lambda.term
+
+(* idem *)
+val translate_def : int AssocTable.t -> tok_def -> string * Lambda.definition

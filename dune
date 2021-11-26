@@ -10,4 +10,4 @@
  ;(preprocess
  ;(pps ppx_inline_test))
  (modules
-  ("main" "lambda" "lexer" "parser" "syntax" "lambdaD" "syntaxD")))
+  ("main" "lambda" "lexer" "parser" "syntax")))

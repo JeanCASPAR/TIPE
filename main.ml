@@ -4,65 +4,37 @@ let perform path f =
   close_in ic;
   res;;
 
-(*let main () =
-  let l = List.fold_left (fun t p ->
-    print_endline p;
-    try
-      let def_list = perform p (fun ic ->
-        let lexbuf = Lexing.from_channel ic in
-        Parser.parse_file Lexer.token lexbuf
-      ) in def_list @ t
-    with
-      | Syntax.SyntaxError Eof ->
-        print_endline "Error: EOF"; t
-      | Syntax.SyntaxError (UnknownVariable s) ->
-        print_endline ("Error: Unknown variable " ^ s); t
-  ) [] (List.tl (Array.to_list Sys.argv)) in
-
-  let l = Syntax.convert_list_def l in
-
-  Lambda.check_program Lambda.empty l;;
-
-Printexc.record_backtrace true;;
-
-(*
-main ();;
-*)
-
-let ic = open_in "test.tipe";;
-let lexbuf = Lexing.from_channel ic;;
-let def_list = Parser.parse_file Lexer.token lexbuf;;
-let l = Syntax.convert_list_def def_list;;
-let l = Lambda.check_program Lambda.empty l;;
-*)
-
 let transform l =
   let rec aux cst_table i = function
   | [] -> []
-  | def :: tl -> let (name, def) = SyntaxD.translate_def cst_table def in
-    def :: aux (SyntaxD.AssocTable.add name i cst_table) (i + 1) tl
-  in aux SyntaxD.AssocTable.empty 0 l;;
+  | def :: tl -> let (name, def) = Syntax.translate_def cst_table def in
+    def :: aux (Syntax.AssocTable.add name i cst_table) (i + 1) tl
+  in aux Syntax.AssocTable.empty 0 l;;
 
-let check_def state {LambdaD.body = b; LambdaD.ty = ty} =
-  LambdaD.show state b ty;
-  let ty = LambdaD.unfold state ty in
-  LambdaD.check state ty;
-  Option.map (fun term ->
-    let term = LambdaD.unfold state term in
-    LambdaD.check state term;
-    let real_ty = LambdaD.typing state term in
+(* Returned the reduced definition if it is correct, raise an error else *)
+let check_def state {Lambda.body = b; Lambda.ty = ty} =
+  Lambda.show state b ty;
+  let ty = Lambda.unfold state ty in
+  Lambda.check state ty;
+  let ty = Lambda.reduce ty in
+  let body = Option.map (fun term ->
+    let term = Lambda.unfold state term in
+    Lambda.check state term;
+    let real_ty = Lambda.typing state term in
     if real_ty <> ty
-    then raise (LambdaD.Error (LambdaD.TypesDoNotMatch (real_ty, ty,
-      "term x = " ^ LambdaD.show_term term ^ " : " ^ LambdaD.show_term real_ty ^
-      " is not of the provided type " ^ LambdaD.show_term ty)))
-  ) b |> ignore
+    then raise (Lambda.Error (Lambda.TypesDoNotMatch (real_ty, ty,
+      "term x = " ^ Lambda.show_term term ^ " : " ^ Lambda.show_term real_ty ^
+      " is not of the provided type " ^ Lambda.show_term ty)))
+  else Lambda.reduce term
+  ) b in
+  {Lambda.body = body; Lambda.ty = ty}
 
 let check_defs defs =
-  let rec aux ({LambdaD.defs = defs} as state) = function
-  | def :: tl -> check_def state def;
-    aux ({state with LambdaD.defs = Array.append defs [|def|]}) tl
+  let rec aux ({Lambda.defs = defs} as state) = function
+  | def :: tl -> let def = check_def state def in
+    aux ({state with Lambda.defs = Array.append defs [|def|]}) tl
   | [] -> ()
-  in aux {LambdaD.defs = [||]; LambdaD.vars = []} defs;;
+  in aux {Lambda.defs = [||]; Lambda.vars = []} defs;;
 
 
 let main () =
@@ -76,7 +48,7 @@ let main () =
         ) in def_list
       with
         | Failure s -> print_endline ("ERROR: " ^ s); []
-    ) |> List.flatten |> List.map (fun ({SyntaxD.name = s} as def) ->
+    ) |> List.flatten |> List.map (fun ({Syntax.name = s} as def) ->
       print_endline s; def
     ) |> transform in
     check_defs defs;;
@@ -86,36 +58,36 @@ let catch f =
   try
     f ()
   with
-    | LambdaD.Error (LambdaD.NotTypable (t, s)) -> print_endline s;
-      print_endline (LambdaD.show_term t)
-    | LambdaD.Error (LambdaD.IsNotASort (t, ty)) -> print_endline
-      (LambdaD.show_term t ^ " : " ^ LambdaD.show_term ty ^ " should be :  s")
-    | LambdaD.Error (LambdaD.ConstantOutOfBound k) -> print_endline
+    | Lambda.Error (Lambda.NotTypable (t, s)) -> print_endline s;
+      print_endline (Lambda.show_term t)
+    | Lambda.Error (Lambda.IsNotASort (t, ty)) -> print_endline
+      (Lambda.show_term t ^ " : " ^ Lambda.show_term ty ^ " should be :  s")
+    | Lambda.Error (Lambda.ConstantOutOfBound k) -> print_endline
       ("Constant " ^ string_of_int k ^ " is unknown")
-    | LambdaD.Error (LambdaD.TypesDoNotMatch (_, _, s)) -> print_endline s
-    | LambdaD.Error (NotClosedTerm k) -> print_endline
+    | Lambda.Error (Lambda.TypesDoNotMatch (_, _, s)) -> print_endline s
+    | Lambda.Error (NotClosedTerm k) -> print_endline
       ("Variable " ^ string_of_int k ^ " is free")
 
 module Test = struct
   let n = {
-    LambdaD.ty = LambdaD.Sort LambdaD.Type;
-    LambdaD.body = None;
+    Lambda.ty = Lambda.Sort Lambda.Type;
+    Lambda.body = None;
   }
   let o = {
-    LambdaD.ty = LambdaD.Constant 0;
-    LambdaD.body = None;
+    Lambda.ty = Lambda.Constant 0;
+    Lambda.body = None;
   }
   let s = {
-    LambdaD.ty = LambdaD.ProductType (LambdaD.Constant 0, LambdaD.Constant 0);
-    LambdaD.body = None;
+    Lambda.ty = Lambda.ProductType (Lambda.Constant 0, Lambda.Constant 0);
+    Lambda.body = None;
   }
   let u = {
-    LambdaD.ty = LambdaD.Constant 0;
-    LambdaD.body = Some (LambdaD.Apply (LambdaD.Constant 2, LambdaD.Constant 1));
+    Lambda.ty = Lambda.Constant 0;
+    Lambda.body = Some (Lambda.Apply (Lambda.Constant 2, Lambda.Constant 1));
   }
   let state = {
-    LambdaD.vars = [];
-    LambdaD.defs = [|
+    Lambda.vars = [];
+    Lambda.defs = [|
       n; o; s
     |];
   }
