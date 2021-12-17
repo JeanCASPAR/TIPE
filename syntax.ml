@@ -18,7 +18,13 @@ let translate_term cst_table t =
   (* n is the number of binders already in scope *)
   (* current is the next free binding index *)
   let rec aux n var_table = function
-  | Var s -> Lambda.Var (AssocTable.find s var_table) (* fail if the term is not closed *)
+  | Var s ->
+    begin try
+      Lambda.Var (AssocTable.find s var_table) (* fail if the term is not closed *)
+    with Not_found ->
+      print_endline (s ^ " is not found.");
+      raise Not_found
+    end
   | Sort u -> Lambda.Sort u
   | Apply (a, b) ->
     let a = aux n var_table a in
