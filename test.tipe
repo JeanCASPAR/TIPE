@@ -4,9 +4,52 @@ def S := @ : /\(n:N).N;
 def U := S O : N;
 
 def Succ := \(x : N). S x : /\(x : N). N;
-def Empty := /\(a : *). a : *;
+
 def Func := \(a : *).\(b : *)./\(x : a).b : /\(a : *)./\(b : *).*;
-def T := Succ : Func N N;
-def And := \(a : *).\(b : *)./\(c : *). Func a (Func b c) : /\(a : *)./\(b : *).*;
 def Id := \(a : *).\(x : a).x : /\(a : *). /\(x : a).a;
-def Absurd := \(a : *).\(e : Empty). e a : /\(a : *)./\(e : Empty).a;
+def T := Succ : Func N N;
+
+def Empty := /\(a : *). a : *;
+def Not := \(a : *).Func a Empty : /\(a : *).*;
+def ProofByAbsurd := \(t : *).\(a : *).\(absurd : Not a). absurd a t :
+    /\(t : *)./\(a : *)./\(absurd : Not a).t;
+def EmptyIsAbsurd := \(x : Empty).Id : Not Empty;
+
+def And := \(a : *).\(b : *)./\(c : *). Func (Func a (Func b c)) c : /\(a : *)./\(b : *).*;
+def AndIntro := \(a : *).\(b : *).\(u : a).\(v : b).
+    \(c : *).\(f : Func a (Func b c)). f u v :
+    
+    /\(a : *)./\(b : *). /\(u : a). /\(v : b). And a b;
+def AndElimL := \(a : *).\(b : *).\(and : And a b). and (\(v : a). \(w : b). v) :
+    /\(a : *)./\(b : *). Func (And a b) a;
+def AndElimR := \(a : *).\(b : *).\(and : And a b). and (\(v : a). \(w : b). w) :
+    /\(a : *)./\(b : *). Func (And a b) b;
+
+def Or := \(a : *).\(b : *)./\(c : *).Func (Func a c) (Func (Func b c) c) :
+    /\(a : *)./\(b : *).*;
+def OrIntroL := \(a : *).\(b : *).\(u : a).
+    \(c : *).\(f : Func a c).\(g : Func b c). f u :
+    /\(a : *)./\(b : *).Func a (Or a b);
+def OrIntroR := \(a : *).\(b : *).\(v : b).
+    \(c : *).\(f : Func a c).\(g : Func b c). g v :
+    /\(a : *)./\(b : *).Func b (Or a b);
+def OrElim := \(a : *).\(b : *).\(c : *).\(u : Or a b).
+    \(f : Func a c).\(g : Func b c). u c f g :
+    
+    /\(a : *)./\(b : *)./\(c : *)./\(u : Or a b).
+    /\(f : Func a c)./\(g : Func b c). c;
+
+def Equiv := \(a : *).\(b : *).And (Func a b) (Func b a) : /\(a : *)./\(b : *).*;
+def EquivIntro := \(a : *).\(b : *).\(f : Func a b).\(g : Func b a).
+    AndIntro (Func a b) (Func b a) f g : /\(a : *)./\(b : *).Equiv a b;
+def EquivElimL := \(a : *).\(b : *).\(equiv: Equiv a b).
+    AndElimL (Func a b) (Func b a) equiv : Func a b;
+def EquivElimR := \(a : *).\(b : *).\(equiv: Equiv a b).
+    AndElimR (Func a b) (Func b a) equiv : Func b a;
+
+def EM := @ := /\(a : *). Or a (Not a);
+
+def DoubleNotIntro := \(a : *).\(u : a).\(v : Not a). v u : /\(a : *).Func a (Not (Not a));
+def DoubleNotElim := \(a : *).\(u : Not (Not a)).
+    OrElim a (Not a) (EM a) (Id a) (\(v : Not a). ProofByAbsurd a v u) :
+    /\(a : *).Func (Not (Not a)) a;
