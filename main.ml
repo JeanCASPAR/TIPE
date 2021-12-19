@@ -61,7 +61,7 @@ let catch f =
     | Lambda.Error (Lambda.NotTypable (t, s)) -> print_endline s;
       print_endline (Lambda.show_term t)
     | Lambda.Error (Lambda.IsNotASort (t, ty)) -> print_endline
-      (Lambda.show_term t ^ " : " ^ Lambda.show_term ty ^ " should be :  s")
+      (Lambda.show_term t ^ " : " ^ Lambda.show_term ty ^ " should be : s")
     | Lambda.Error (Lambda.ConstantOutOfBound k) -> print_endline
       ("Constant " ^ string_of_int k ^ " is unknown")
     | Lambda.Error (Lambda.TypesDoNotMatch (_, _, s)) -> print_endline s
@@ -91,7 +91,60 @@ module Test = struct
       n; o; s
     |];
   }
-  let test () = check_def state u
+  let test () = ignore (check_def state u);
+    ()
+  
+  let test_check () =
+    let state = {
+      Lambda.defs = [||];
+      Lambda.vars = [Lambda.Sort Type; Sort Type];
+    } in
+    let term = Lambda.ProductType (Var 2, Var 3)
+    in
+    let ty = Lambda.Sort Type
+    in
+    let def =
+      {
+        Lambda.body = Some term;
+        Lambda.ty = ty;
+      }
+    in ignore (check_def state def);
+
+    let state = {
+      Lambda.defs = [||];
+      Lambda.vars = [Sort Type];
+    } in
+    let term = Lambda.Abstraction (Sort Type,
+      ProductType (Var 2, Var 3)
+    ) in
+    let ty = Lambda.ProductType (Sort Type, Sort Type)
+    in
+    let def =
+      {
+        Lambda.body = Some term;
+        Lambda.ty = ty;
+      }
+    in ignore (check_def state def);
+
+
+    let state = {
+      Lambda.defs = [||];
+      Lambda.vars = [];
+    } in
+    let term = Lambda.Abstraction (Sort Type,
+    Abstraction (Sort Type,
+      ProductType (Var 2, Var 3)
+    )) in
+    let ty = Lambda.ProductType (Sort Type,
+      ProductType (Sort Type, Sort Type)
+    ) in
+    let def =
+      {
+        Lambda.body = Some term;
+        Lambda.ty = ty;
+      }
+    in ignore (check_def state def);
+    ()
 end;;
 
 catch main;;

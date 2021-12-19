@@ -105,7 +105,7 @@ let pop_var state = match state.vars with
 
 (* we can massively use reduce because we know the term are well-typed *)
 let rec typing state t = begin match reduce t with
-| Var k -> List.nth (List.rev state.vars) (k - 1) (* it *is* the correct order of indexing *)
+| Var k -> List.nth  state.vars (k - 1) (* it *is* the correct order of indexing *)
 | Sort Type -> Sort Kind
 | Sort Kind -> raise (Error (NotTypable (Sort Kind,
   "[This state shouldn't be reached] term Kind does not have a type")))
@@ -127,15 +127,22 @@ let fail_if_not_sort state t = match typing state t with
 | ty -> raise (Error (IsNotASort (t, ty)))
 
 let rec check state = let n = List.length state.vars in function
-| Var k when k = n -> let (ty, st) = pop_var state in (* safe because k >= 1*)
+| Var k when k <= n ->
+  if k = 0
+    then failwith "k = 0";
+  let (ty, st) = pop_var state in (* safe because k >= 1*)
   check st ty;
   fail_if_not_sort st ty;
-  let t1 = typing state (Var k)
-  and t2 = reduce ty
-  in if t1 <> t2
-  then raise (Error (TypesDoNotMatch (t1, t2, "Var " ^ string_of_int k ^
-  " should be of type t2 = " ^ show_term t2 ^ ", not t1 = " ^ show_term t1)))
-| Var k when k > n -> raise (Error (NotClosedTerm k)) (* the term is not closed *)
+  if k = 1
+  then
+    let t1 = typing state (Var k)
+    and t2 = reduce ty
+    in if t1 <> t2
+    then raise (Error (TypesDoNotMatch (t1, t2, "Var " ^ string_of_int k ^
+    " should be of type t2 = " ^ show_term t2 ^ ", not t1 = " ^ show_term t1)))
+  else
+    check st (Var (k - 1));
+| Var k (* k > n *) -> raise (Error (NotClosedTerm k)) (* the term is not closed *)
 | Sort Type when state.vars = [] -> ()
 | Sort Kind -> raise (Error (NotTypable (Sort Kind, "term Kind does not have a type")))
 | Apply (a, b) ->
@@ -157,7 +164,7 @@ let rec check state = let n = List.length state.vars in function
   check state a;
   fail_if_not_sort state a;
   check (push_var a state) b;
-  fail_if_not_sort (push_var a state) b
+  fail_if_not_sort (push_var a state) b;
 | Constant k -> if (k >= Array.length state.defs)
   then raise (Error (ConstantOutOfBound k))
 (* the term is either a variable different from the last free variable of state.vars, or * : # with a non-empty list of free variables *)

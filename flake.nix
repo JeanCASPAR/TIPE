@@ -9,20 +9,31 @@
     let
       pkgs = nixpkgs.legacyPackages.${system};
       ocamlPackages = pkgs.ocamlPackages;
-    in {
-      # packages.${system}.tipe = ;
-      # defaultPackage = self.packages.${system}.tipe;
-      devShell = pkgs.mkShell {
-        buildInputs = (with ocamlPackages; [
+      commonBuildDeps = with ocamlPackages; [
           pkgs.dune_2
           ocaml
+          menhir
+      ];
+      derivation = { debug ? true } : ocamlPackages.buildDunePackage {
+        pname = if debug then "tipe_debug" else "tipe";
+        version = "0.1.0";
+        useDune2 = true;
+        src = ./.;
+        nativeBuildInputs = commonBuildDeps;
+      };
+    in rec {
+      packages = {
+        tipe = derivation { debug = false; };
+        tipe_debug = derivation {};
+      };
+      defaultPackage = packages.tipe_debug;
+      devShell = pkgs.mkShell {
+        buildInputs = (with ocamlPackages; [
           merlin
           ocp-indent
           ocaml-lsp
-          menhir
-          ppxlib
-          ppx_inline_test
-        ]);
+          findlib
+        ] ++ commonBuildDeps);
       };
     });
 }
