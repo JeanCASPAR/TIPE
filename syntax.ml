@@ -58,7 +58,7 @@ let rec show_syntax_term = function
 let _ = show_syntax_term
 
 let translate_def cst_table def =
-  (* debugging purpose
+  (* for debugging purpose
   AssocTable.iter (fun s i -> print_endline (s ^ " : " ^ string_of_int i)) cst_table;
   let _ = Option.map (fun t -> print_endline (show_syntax_term t)) def.body in
   print_endline (show_syntax_term def.ty);

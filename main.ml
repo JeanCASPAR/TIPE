@@ -30,7 +30,7 @@ let check_def state {Lambda.body = b; Lambda.ty = ty} =
   {Lambda.body = body; Lambda.ty = ty}
 
 let check_defs defs =
-  let rec aux ({Lambda.defs = defs} as state) = function
+  let rec aux ({Lambda.defs = defs; _} as state) = function
   | def :: tl -> let def = check_def state def in
     aux ({state with Lambda.defs = Array.append defs [|def|]}) tl
   | [] -> ()
@@ -48,7 +48,7 @@ let main () =
         ) in def_list
       with
         | Failure s -> print_endline ("ERROR: " ^ s); []
-    ) |> List.flatten |> List.map (fun ({Syntax.name = s} as def) ->
+    ) |> List.flatten |> List.map (fun ({Syntax.name = s; _} as def) ->
       print_endline s; def
     ) |> transform in
     check_defs defs;;
@@ -94,12 +94,12 @@ module Test = struct
   let test () = ignore (check_def state u);
     ()
   
-  let test_check () =
+  let test_func_type () =
     let state = {
       Lambda.defs = [||];
       Lambda.vars = [Lambda.Sort Type; Sort Type];
     } in
-    let term = Lambda.ProductType (Var 2, Var 3)
+    let term = Lambda.ProductType (Var 2, Var 2)
     in
     let ty = Lambda.Sort Type
     in
@@ -115,7 +115,7 @@ module Test = struct
       Lambda.vars = [Sort Type];
     } in
     let term = Lambda.Abstraction (Sort Type,
-      ProductType (Var 2, Var 3)
+      ProductType (Var 2, Var 2)
     ) in
     let ty = Lambda.ProductType (Sort Type, Sort Type)
     in
@@ -133,7 +133,7 @@ module Test = struct
     } in
     let term = Lambda.Abstraction (Sort Type,
     Abstraction (Sort Type,
-      ProductType (Var 2, Var 3)
+      ProductType (Var 2, Var 2)
     )) in
     let ty = Lambda.ProductType (Sort Type,
       ProductType (Sort Type, Sort Type)
@@ -145,6 +145,51 @@ module Test = struct
       }
     in ignore (check_def state def);
     ()
+  
+  let test_id () =
+    let state = {
+      Lambda.defs = [||];
+      vars = [Var 1; Sort Type];
+    } in
+    let term = Lambda.Var 1
+    in
+    let ty = Lambda.Var 2
+    in
+    let def = {
+      Lambda.body = Some term;
+      ty;
+    }
+  in ignore (check_def state def);
+
+    let state = {
+      Lambda.defs = [||];
+      vars = [Sort Type];
+    } in
+    let term = Lambda.Abstraction (Var 1, Var 1)
+    in
+    let ty = Lambda.ProductType (Var 1, Var 2)
+    in
+    let def = {
+      Lambda.body = Some term;
+      ty;
+    }
+  in ignore (check_def state def);
+    
+    let state = {
+      Lambda.defs = [||];
+      vars = [];
+    } in
+    let term = Lambda.Abstraction (Sort Type,
+      Lambda.Abstraction (Var 1, Var 1)
+    ) in
+    let ty = Lambda.ProductType (Sort Type,
+      Lambda.ProductType (Var 1, Var 2)
+    ) in
+    let def = {
+      Lambda.body = Some term;
+      ty;
+    }
+  in ignore (check_def state def);
 end;;
 
 catch main;;

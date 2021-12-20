@@ -26,11 +26,6 @@ let substitute n a b = subst (function
 | k -> Var k) a;;
 
 (* it preserves well-typing *)
-let reduce_step = function
-| Apply (Abstraction (_, b), c) -> substitute 1 b c
-| Apply (ProductType (_, b), c) -> substitute 1 b c
-| t -> t
-
 let rec reduce = function
 | Abstraction (a, b) -> Abstraction (reduce a, reduce b)
 | ProductType (a, b) -> ProductType (reduce a, reduce b)
@@ -40,10 +35,6 @@ let rec reduce = function
   | t -> Apply (reduce t, reduce b)
 end
 | t -> t
-
-let is_sort t = match reduce t with
-| Sort _ -> true
-| _ -> false
 
 type definition = {
   body : term option; (* None stands for an axiom. It is written @ in the grammar *)
@@ -75,7 +66,7 @@ let show_def state =
 let show state term ty =
   print_newline ();
   print_string (show_def state);
-  List.iter (fun t -> print_endline (show_term t ^ ";")) state.vars;
+  List.iter (fun t -> print_endline (show_term t ^ ";")) (List.rev state.vars);
   print_endline ("|- " ^ (match term with Some t -> show_term t | None -> "@") ^ " : " ^ show_term ty ^ " §");
   print_newline ()
 
@@ -105,7 +96,17 @@ let pop_var state = match state.vars with
 
 (* we can massively use reduce because we know the term are well-typed *)
 let rec typing state t = begin match reduce t with
-| Var k -> List.nth  state.vars (k - 1) (* it *is* the correct order of indexing *)
+| Var k ->
+  let rec incr_by_n n t = match n with
+  | 0 -> t
+  | n -> incr_by_n (n - 1) (incr t)
+  in
+  (* we retrieve the type of t *)
+  let ty = List.nth state.vars (k - 1) in
+  (* we adapt the type to the current context *)
+  (* let vars = Array.of_list (
+    List.filteri (fun i _ -> i >= k) state.vars) in *)
+  incr_by_n k ty
 | Sort Type -> Sort Kind
 | Sort Kind -> raise (Error (NotTypable (Sort Kind,
   "[This state shouldn't be reached] term Kind does not have a type")))
@@ -129,21 +130,29 @@ let fail_if_not_sort state t = match typing state t with
 let rec check state = let n = List.length state.vars in function
 | Var k when k <= n ->
   if k = 0
-    then failwith "k = 0";
+  then
+    failwith "k = 0";
+
   let (ty, st) = pop_var state in (* safe because k >= 1*)
   check st ty;
   fail_if_not_sort st ty;
+
   if k = 1
-  then
+  then begin
     let t1 = typing state (Var k)
-    and t2 = reduce ty
+    and t2 = reduce (incr ty) (* ty live in a context with one less variable *)
     in if t1 <> t2
     then raise (Error (TypesDoNotMatch (t1, t2, "Var " ^ string_of_int k ^
     " should be of type t2 = " ^ show_term t2 ^ ", not t1 = " ^ show_term t1)))
-  else
-    check st (Var (k - 1));
+  end else
+    check st (Var (k - 1))
 | Var k (* k > n *) -> raise (Error (NotClosedTerm k)) (* the term is not closed *)
 | Sort Type when state.vars = [] -> ()
+| Sort Type ->
+  let (ty, st) = pop_var state in
+  check st ty;
+  fail_if_not_sort st ty;
+  check st (Sort Type);
 | Sort Kind -> raise (Error (NotTypable (Sort Kind, "term Kind does not have a type")))
 | Apply (a, b) ->
   check state a;
@@ -156,22 +165,20 @@ let rec check state = let n = List.length state.vars in function
     " and b = " ^ show_term b ^ " : " ^ show_term x)))
   end
 | Abstraction (a, b) ->
-  check (push_var a state) b;
-  let c = typing (push_var a state) b in
+  let new_state = push_var a state in
+  check new_state b;
+  let c = typing new_state b in
   check state (ProductType (a, c));
   fail_if_not_sort state (ProductType (a, c));
 | ProductType (a, b) ->
   check state a;
   fail_if_not_sort state a;
-  check (push_var a state) b;
-  fail_if_not_sort (push_var a state) b;
+  let new_state = push_var a state in
+  check new_state b;
+  fail_if_not_sort new_state b;
 | Constant k -> if (k >= Array.length state.defs)
   then raise (Error (ConstantOutOfBound k))
-(* the term is either a variable different from the last free variable of state.vars, or * : # with a non-empty list of free variables *)
-| t -> let (ty, st) = pop_var state in
-  check st t;
-  check st ty;
-  fail_if_not_sort st ty
+
 
 module Test = struct
   let test_reduce =
@@ -204,4 +211,12 @@ module Test = struct
       ProductType (Var 2, Var 2))), Constant 0), Constant 0) in
     assert (reduce t = ProductType (Constant 0, Constant 0));
     ()
+
+  let test_typing () =
+    let state = {
+      defs = [||];
+      vars = [Var 1; Sort Type];
+    } in
+    let term = Var 1
+    in print_endline ("@" ^ show_term (typing state term));
 end
